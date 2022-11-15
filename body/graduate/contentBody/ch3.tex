@@ -1,11 +1,10 @@
 \chapter{隐私保护的链上链下协同计算模型}
 
-为了满足去中心化计算的特质似乎存在一个潜在的要求，即智能合约的执行逻辑与输入输出数据对于所有节点来说都是透明的。而这一约束极大限制了存在数据隐私需求的应用实现去中心化特性。有助于解除这一约束的密码学工具是零知识证明技术。如前所述，研究人员已经提出了一些满足各种隐私定义与信任假设的系统。然而他们对系统的具现化实现与一些特定信任假设的强依赖从根本上就限制了模型的通用性，通常只能工作在特定场景中而不能满足各类应用的开发需求。对此，我们尝试通过本章解答这一问题：
-\begin{center}
-    \textbf{是否存在一个隐私保护的通用模型可以满足去中心化特性与可用性？}
-\end{center}
-\section{系统模型}
-在本节我们将对系统中涉及的模块进行介绍与功能划分，这有助于我们后续对系统拆分进行单独建模并提供一个可组合的通用模型。
+为了满足去中心化计算的特质似乎存在一个潜在的要求，即智能合约的执行逻辑与输入输出数据对于所有节点来说都是透明的。而这一约束极大限制了存在数据隐私需求的应用实现去中心化特性。
+
+有助于解除这一约束的密码学工具是零知识证明技术。如前所述，研究人员已经提出了一些满足各种隐私定义与信任假设的系统\cite{//}。然而这些工作并没有讨论到针对数据孤岛场景下的适用性。他们对系统的具现化实现和对特定信任的强依赖使得模型通常只能工作在特定场景中而不能满足各类应用的开发需求。对此，我们尝试通过本章解答这一问题：\textbf{在数据孤岛场景下是否存在一个满足去中心化特性的隐私保护通用模型？}
+\section{系统架构}
+在本节我们将对系统中涉及的模块进行介绍与功能划分，这有助于我们后续对系统拆分进行单独建模并组合为一个通用模型。
 \subsection{基础结构}
 \begin{figure}[htbp]
     \centering
@@ -19,14 +18,16 @@
 
 值得一提的是在隐私保护下的智能合约可以被细化为两个部分，即链上合约与链下合约，分别部署在链上节点和链下计算节点中。链上合约维护了分布式账本上公共状态$\sigma$，而链下合约则分别维护链下节点的私有状态。对于链下节点$\mathit{p}$,对应的私有状态记为$\rho_\mathit{p}$。对于涉及只一方的交易，对应的智能合约状态可以描述为$(\sigma, \rho_\mathit{p})$。虽然诚实的链下计算节点，往往根据预先约定的合约行为更新自己的私有状态。但是合约设计者必须意识到链下节点的私有状态更新是不被默认信任的，不诚实节点可以随意更改他们的状态。对于必须依赖链下节点状态的合约行为，可以通过要求链下计算节点提供状态更新证明来补全信任，然而这也会增加交互代价和公共状态规模\cite{9505181}。
 
-为了对隐私保护这一特性进行建模，我们需要指出在整个系统中，只有那些经过提前协商并固定在合约行为中的用户隐私是允许被泄露的。这样的泄露只发生在两种情况下：用户提交交易到分布式账本，链下计算中涉及的隐私输入。对此文献\cite{9505181}指出在用户交易广播之前可要求他们签署对隐私泄露的描述文件来获得限定隐私泄露的许可。显然针对交易体中泄露的隐私内容受限于链上合约的设计，其使用逻辑是公开透明的。而针对链下计算中使用的隐私输入，尽管我们无法披露计算的具体过程，但是对计算结果的验证和应用受限于链上的验证过程。通过固定链上的证明逻辑与协同计算间的语义信息，我们可以反过来约束在链下计算中泄露的隐私内容。综上，我们可以确保在这仅含这两种隐私泄露场景的协同计算系统中用户和链下计算节点能够实现对自己的隐私泄露情况的完全控制。
+为了对隐私保护这一特性进行建模，我们需要指出在整个系统中，只有那些经过提前协商并固定在合约行为中的用户隐私是允许被泄露的。这样的泄露只发生在两种情况下：用户提交交易到分布式账本，链下计算中涉及的隐私输入。对此文献\cite{9505181}指出在用户交易广播之前可要求他们签署对隐私泄露的描述文件来获得限定隐私泄露的许可。显然针对交易体中泄露的隐私内容受限于链上合约的设计，其使用逻辑是公开透明的。而针对链下计算中使用的隐私输入，尽管我们无法披露计算的具体过程，但是对计算结果的验证和应用始终受限于链上的验证过程。通过固定链上的证明逻辑与协同计算间的语义信息，我们可以反过来约束在链下计算中泄露的隐私内容。综上，我们可以确保在仅含这两种隐私泄露场景的协同计算系统中，用户和链下计算节点能够实现对自己的隐私泄露情况的完全控制。
 \subsection{功能定义}
 我们将触发一次智能合约状态变更的全过程，即$(\sigma, \rho_\mathit{p})\rightarrow(\sigma', \rho_\mathit{p}')$，定义为一次链上链下协同计算。这一定义有助于我们简化一些复杂的合约行为，例如一笔交易执行过程中包含多方链下隐私计算，可以将其划分为多次链上链下协同计算来描述。关于这类问题，我们将在后续小节作详细介绍。
 
 基于\autoref{fig:ch3-structure}构建的系统模型，我们可以简单描述出一次完整的隐私保护协同计算过程。如下所述，在一次协同计算过程中，每个步骤都是顺序执行的关系。其中涉及隐私保护的步骤为可选项，这是因为即使在一个存在隐私保护内容的智能合约中也可能包含部分逻辑不涉及链下计算节点的隐私泄露。
 
 \begin{enumerate}
-\setlength{\itemsep}{1pt}
+    \setlength{\itemsep}{0pt}
+    \setlength{\parsep}{0pt}
+    \setlength{\parskip}{0pt}
 \item 用户基于自身数据构建一笔交易内容，并提交给链上节点。
 \item 链上节点在执行交易时将调用链上合约的相应逻辑，这一逻辑除 了链上的计算过程外还可能包括对链下计算的调用请求$\mathit{q}$。
 \item （可选）调用请求$\mathit{q}$将被发送到链下计算节点$\mathit{p}$进行处理。
@@ -40,9 +41,9 @@
 \section{智能合约模型}
 智能合约通常被描述并实现为复制状态机，传递给状态机的输入一般从记录在账本上的交易中获取。为了描述隐私保护的智能合约模型，我们需要对这一定义作调整。这是因为如果所有输入都来自分布式账本上的交易，该模型中的所有数据都是公开可见的。
 
-此处我们仍将隐私保护的智能合约抽象为复制状态机，将传递的输入替换为账本上记录的标识符，智能合约可以跟踪并验证这些标识符对应的输入信息。本节我们对基于复制状态机的智能合约模型进一步细化讨论，通过状态转移函数$\Gamma$来描述智能合约状态的变化$\Delta$，并构建隐私泄露函数$\Lambda_\sigma, \Lambda_\rho$用于分析在跟踪验证标识符对应输入的过程中发生的数据。
+此处我们仍将隐私保护的智能合约抽象为复制状态机，将传递的输入替换为账本上记录的标识符，智能合约可以跟踪并验证这些标识符对应的输入信息。本节我们对基于复制状态机的智能合约模型进一步细化讨论，通过状态转移函数$\Gamma$来描述智能合约状态的变化，并构建隐私泄露函数$\Lambda_\sigma, \Lambda_\rho$用于分析在跟踪验证标识符对应输入的过程中发生的数据。
 \subsection{智能合约状态转移}
-如\autoref{fig:ch3-transfer}所示，基于隐私保护的智能合约状态应包含两部分：链上与链下。基于这一背景，本节中我们先分别提出链上与链下部分的状态交互模型，再给出系统状态转移函数，最后组合为隐私保护的链上链下协同计算状态转移模型$\Delta$。
+如\autoref{fig:ch3-transfer}所示，基于隐私保护的智能合约状态应包含两部分：链上与链下。基于这一背景，本节中我们先分别提出链上与链下部分的状态交互模型，再给出系统状态转移函数，最后组合为隐私保护的链上链下协同计算状态转移模型。
 
 \begin{figure}[htbp]
     \centering
@@ -50,18 +51,24 @@
     \caption{\label{fig:ch3-transfer}智能合约状态转移图}
 \end{figure}
 
-定义链下计算$\mathcal{O}_{\alpha}$为一个维护状态$\alpha$的交互式模块，假设$\alpha$初始状态为$\alpha_0$，当前的上下文为$z$，链下计算的运行脚本为$transcript$，向量$\vec{\alpha}$按执行顺序依次记录每次$transcript$的执行状态。那么$\mathcal{O}_{\alpha}$允许的交互如下：
+定义链下计算$\mathcal{O}_{\alpha}$为一个维护状态$\alpha$的交互式模块，假设$\alpha$初始状态为$\alpha_0$，当前的上下文为$z$，链下计算的运行脚本为$\mathcal{T}_\alpha$，向量$\vec{\alpha}$按执行顺序依次记录每次$\mathcal{T}_\alpha$的执行状态。那么$\mathcal{O}_{\alpha}$允许的交互如下：
 
-\noindent\hrulefill
+\begin{center}
+    链下计算$\mathcal{O}_{\alpha}$
+\end{center}
+\noindent\hrule
 \begin{description}
-\item 收到请求$q(transcript, \omega)$，使用隐私输入$\omega$执行$transcript$：\newline
+    \setlength{\itemsep}{0pt}
+    \setlength{\parsep}{0pt}
+    \setlength{\parskip}{0pt}
+\item \textbf{收到请求$q(\mathcal{T}_\alpha, w)$，使用隐私输入$w$执行$\mathcal{T}_\alpha$：}\newline
 if $\alpha = \perp$ then return $\perp$\newline
-计算$(\alpha', r) \leftarrow q(transcript, \omega, z, \alpha)$\newline
+计算$(\alpha', r) \leftarrow q(\mathcal{T}_\alpha, w, z, \alpha)$\newline
 $\alpha \leftarrow \alpha'$\newline
 return $r$
-\item 收到请求$apply$：\newline
+\item \textbf{收到请求$apply$：}\newline
 $\vec{\alpha} \leftarrow \vec{\alpha} \parallel \alpha$
-\item 收到请求$check$：\newline
+\item \textbf{收到请求$check$：}\newline
 return $(\vec{\alpha}, \alpha)$
 \end{description}
 \noindent\hrule
@@ -69,8 +76,14 @@ return $(\vec{\alpha}, \alpha)$
 
 链上计算与链下类似，但是请求的内容不再包含隐私输入，而是用户创建的交易$\tau$。需要注意的是在链上与链下交互模型中虽然都存在上下文$z$，但是两者的具体内容并不相同，例如为了提供隐私保护，链下计算的上下文中会包含随机因子$\eta$。后续我们将具体讨论$z$中的内容。以下我们给出链上计算$\mathcal{O}_{\alpha}$允许的交互：
 
-\noindent\hrulefill
+\begin{center}
+    链上计算$\mathcal{O}_{\alpha}$
+\end{center}
+\noindent\hrule
 \begin{description}
+    \setlength{\itemsep}{0pt}
+    \setlength{\parsep}{0pt}
+    \setlength{\parskip}{0pt}
 \item 收到请求$q(\tau)$：\newline
 if $\alpha = \perp$ then return $\perp$\newline
 计算$(\alpha', r) \leftarrow q(\tau, z, \alpha)$\newline
@@ -86,35 +99,43 @@ return $(\vec{\alpha}, \alpha)$
 
 与KACHAIN\cite{9505181}类似，我们使用状态转移函数来描述合约状态变更过程。设合约初始状态为$\varnothing$，在确定输入时，状态转移函数将给出固定的输出和对应的新状态。尽管为了隐私保护模型可能会引入随机流，但是这并不会影响状态转移函数的确定性。这是因为对于智能合约模型，一笔交易被创建后，其所需的随机参数都应被固定在内容中。
 
-对此，我们给出系统状态转移函数$\Gamma$的声明，即$\Gamma:(\varnothing', c, y) \leftarrow f(\varnothing, p, z, \omega, a, \tau)$。其中，$\varnothing$表示初始状态；$\varnothing'$表示合约执行后的新状态；$p$为交易发起方；$a$表示系统中的对抗性输入，例如交易的执行顺序可能受到影响；$c$为交易的状态，包括被拒绝$\perp$与成功执行$\mathsf{T}$两种；$z$表示执行过程中的系统上下文；$\tau$表示交易。可以知道$\Gamma$实际可以由两部分构成：$\Gamma: (\Gamma_{\mathcal{O}_\sigma}, \Gamma_{\mathcal{O}_\rho})$。
-
-基于维护状态$\alpha$的交互式模块的状态转移函数$\Gamma_{\mathcal{O}_\alpha}$，其执行流程如下：
+对此，我们给出系统状态转移函数$\Gamma$的声明，即$\Gamma:(\varnothing', c, y) \leftarrow f(\varnothing, p, z, w, a, \tau)$。其中，$\varnothing$表示初始状态；$\varnothing'$表示合约执行后的新状态；$p$为交易发起方；$a$表示系统中的对抗性输入，例如交易的执行顺序可能受到影响；$c$为交易的状态，包括被拒绝$\perp$与成功执行$\mathsf{T}$两种；$z$表示执行过程中的系统上下文；$\tau$表示交易。可以知道$\Gamma$实际可以由两部分构成：$\Gamma: (\Gamma_{\mathcal{O}_\sigma}, \Gamma_{\mathcal{O}_\rho})$。基于维护状态$\alpha$的交互式模块的状态转移函数$\Gamma_{\mathcal{O}_\alpha}$，其执行流程如下：
 \begin{center}
     状态转移函数$\Gamma_{\mathcal{O}_\alpha}$
 \end{center}
 \noindent\hrule
 \begin{description}
+    \setlength{\itemsep}{0pt}
+    \setlength{\parsep}{0pt}
+    \setlength{\parskip}{0pt}
     \item 给定输入：$q$
+    \subitem let $c \leftarrow \mathsf{T}, y \leftarrow \perp$
     \subitem send $q$ to $\mathcal{O}_\alpha$, receive $r$
+    \subitem let $y \leftarrow r$
     \subitem send $check$ to $\mathcal{O}_\alpha$, receive $(\vec{\alpha}, \alpha)$
-    \subitem if $\alpha \neq \perp$, then send $apply$ to $\mathcal{O}_\alpha$
-    \subitem return $(\vec{\alpha}, r)$
+    \subitem if $\alpha = \perp \vee y = \perp \vee verify(y) = \perp$, then
+    \subsubitem let $c \leftarrow \perp$
+    \subsubitem return $(\alpha, c, y)$
+    \subitem send $apply$ to $\mathcal{O}_\alpha$
+    \subitem return $(\alpha,  c, y)$
 \end{description}
 \noindent\hrule
 ~\\
 
 最后根据上述定义和功能分析，我们给出基于隐私保护的链上链下协同计算模型的状态转移流程如下所示。
 \begin{center}
-    隐私保护的链上链下协同计算模型状态转移$\Delta$
+    隐私保护的链上链下协同计算模型状态转移流程
 \end{center}
 \noindent\hrule
 \begin{description}
-    \item 给定输入：$(\sigma, \rho), p, \omega, a, z, \tau$
+    \setlength{\itemsep}{0pt}
+    \setlength{\parsep}{0pt}
+    \setlength{\parskip}{0pt}
+    \item 给定输入：$(\sigma, \rho), p, w, a, z, \tau$
     \subitem let $(\sigma_{new}, \rho[p]_{new}, c, y') \leftarrow \Gamma(\sigma, \rho[p], p, \omega, z, a, \tau)$
     \subitem let $\sigma' \leftarrow \sigma, \rho' \leftarrow \rho, y \leftarrow \perp, C \leftarrow c$
     \subitem if $\sigma_{new} = \perp \vee \rho[p]_{new} = \perp$ then
         \subsubitem let $C \leftarrow \perp$
-        \subsubitem break
     \subitem let $\sigma' \leftarrow \sigma_{new}, \rho'[p] \leftarrow \rho[p]_{new}, y \leftarrow y'$
     \subitem return $(\sigma', \rho'), C, y$
 \end{description}
@@ -122,60 +143,105 @@ return $(\vec{\alpha}, \alpha)$
 \subsection{用户交易隐私泄露}
 隐私泄露与状态转移的分离性是基于智能合约的执行逻辑造成的，当一笔交易被创建并提交后，其泄露的隐私数据已被固定，而后才通过智能合约的执行完成状态转移。因此我们可以对交互过程中隐私数据泄露进行独立建模，从而保证模型是具备隐私保护性质的。如前所述，交互中可能存在的输入点有两个，用户构建交易与链下计算节点计算时使用的输入。
 
-对于用户创建交易造成的隐私泄露较为直观，因为交易一旦提交至链上账本都将公开可见，因此泄露的数据即为交易中的具体内容。自然地，我们给出用户交易隐私泄露函数$\Lambda_\sigma$的定义：$(desc, D, z) \leftarrow f(u, v)$。其中，$u$为创建交易的用户，$v$为用户u的智能合约视图，$desc$提供了对需要泄露的隐私数据精确描述，$z$表示一些可能需要的上下文信息，$D$则是对应交易在账本上所依赖的相关交易的记录集合。
+对于用户创建交易造成的隐私泄露较为直观，因为交易一旦提交至链上账本都将公开可见，因此泄露的数据即为交易中的具体内容。自然地，我们给出用户交易隐私泄露函数${lkg}_\sigma$的定义：$(desc, D, z) \leftarrow f(u, v, \tau)$。其中，$u$为交易创建方，$v$为$u$对应的智能合约视图，$desc$提供了对需要泄露的隐私数据精确描述，$z$表示一些可能需要的上下文信息，$D$则是对应交易在账本上所依赖的相关交易的记录集合。
 
-对于用户$u$的智能合约视图$v$应该包含与$u$相关的账本信息，即账本中的智能合约相关状态$\sigma$，$u$所能看见的账本长度，$u$对应账本上未确认的交易集合。$desc$是函数返回中极为重要的一项，这是用户对自身泄露隐私情况的了解方式。当用户根据$desc$意识到发起交易泄露的隐私数据不符合预期时，可以取消创建交易避免隐私的意外泄露。因此隐私泄露函数作为隐私保护的必要前提在安全性分析中不应该存在恶意的修改或用于对手的模拟。
+基于之前所述的系统架构，交易创建方$u$所指代的可能为用户也可能为链下计算节点。交易创建方$u$对应的智能合约视图$v$应该包含与$u$相关的账本信息，即账本中的智能合约相关状态$\sigma$，$u$所能看见的账本长度，账本上未确认的交易集合$U$。$desc$是函数返回中极为重要的一项，这是用户对自身泄露隐私情况的了解方式。当交易创建者根据$desc$意识到发起交易泄露的隐私数据不符合预期时，可以取消创建交易避免隐私的意外泄露。因此隐私泄露函数作为隐私保护的必要前提在安全性分析中不应该存在被恶意修改的可能或用于对手的模拟。
 \subsection{链下计算隐私泄露}
-基于NIZK的链下计算通过构建证明的方式在隐藏了隐私输入的同时提供对链下的验证，然而对于验证时所需的公共输入或交互中附加的数据仍会被暴露出来。需要强调的是此处对泄露的定义是指约束在合约上的可预见的数据泄露，是用户允许透露的信息。通过对约定泄露和未预期的数据泄露进行区分有助于后续验证模型的安全性和隐私保护能力。
+基于NIZK的链下计算通过构建证明的方式在隐藏了隐私输入的同时提供对链下的验证，然而对于验证时所需的公共输入或交互中附加的数据仍会被暴露出来。需要再次强调的是此处对泄露的定义是指约束在合约上的可预见的数据泄露，是节点允许透露的信息。通过对约定泄露和未预期的数据泄露进行区分有助于后续验证模型的安全性和隐私保护能力。
 
-进一步地，我们定义链下计算隐私泄露函数，即$\Lambda_\rho：(desc, D, z) \leftarrow f(p, v, transcript)$。与$\Lambda_\sigma$的定义相类似，$p$为创建交易的链下计算节点，$v$为$p$的智能合约视图，$desc$提供了对需要泄露的隐私数据精确描述，$z$表示一些可能需要的上下文信息，$D$则是对应交易在账本上所依赖的相关交易的记录集合。此处还需要提供链下计算节点上部署的NIZK计算脚本$transcript$作为补充输入。这是因为在链上验证链下计算的框架中，智能合约实际由链上的公开合约与链下计算脚本共同构成。
-\section{协同计算交易}
+进一步地，我们定义链下计算隐私泄露函数，即${lkg}_\rho:(desc, D, z) \leftarrow f(v, w, \mathcal{T})$。与${lkg}_\sigma$的定义相类似，$v$为链下计算节点$p$的智能合约视图，$desc$提供了对需要泄露的隐私数据精确描述，$z$表示一些可能需要的上下文信息，$D$则是对应计算在链下账本上所依赖的相关计算的记录集合。此处还需要提供链下计算节点上部署的NIZK计算脚本$\mathcal{T}$和链下计算时指定的隐私输入标识$w$作为补充输入。
+\section{协同计算框架}
+\subsection{简单分段式提交}
+隐私保护的协同计算模型往往关注于链下证明在链上的验证过程，不过多讨论用户向链下计算节点发起创建证明的过程。我们认为这一部分是不容忽视的，在用户并未部署链下计算节点的场景下，一方面用户可能无法直接创建与链下计算节点的安全连接，另一方面出于留证等需求可能要求保留对链下计算的申请记录。
 
-\subsection{交易分段提交}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.3\linewidth]{logo/zju}
+    \caption{\label{fig:ch3-twophase}分段式提交示意图}
+\end{figure}
 
-trans组+checkpoint
-\subsection{交易依赖性分析}
+基于上述背景，我们考虑将一次链上链下协同计算过程通过一组交易的方式串联起来。通过分布式账本记录自然地留存计算过程中与链下计算节点的交互记录。另外把链上合约方法作为中间层处理用户请求链下计算结果的流程。如\autoref{fig:ch3-twophase}所示，在每笔交易执行过程中触发下一个链下计算请求。如果中间某个链下计算失败，我们将终止后续的请求流程，并把账本记录维护在最后一个成功执行的状态点。
 
-\section{面向链上链下协同计算的通用协议}
-\subsection{基于KACHAIN的前置建模}
-简单账本模型
-
-零知识证明
-\subsection{协议概述}
-基于前述的模型构建与分析，我们可以构造出面向链上链下协同计算的通用协议用来抽象化协同计算的整体过程。协议的核心思想为将一次完整的协同计算转化为两阶段执行：1）首先用户签署隐私泄露描述并构建一阶段交易调用智能合约方法，链上更新状态；2）在第二阶段中我们使用NIZK来证明链上合约与链下计算的交互过程，并在链上应用相关的公共状态。
-
-其中需要NIZK证明的交互过程$\mathcal{L}$可以被描述为：定义$(\mathcal{T}_\rho, \omega) \in \mathcal{L}$，给定任意状态转移函数$\Gamma$，当且仅当$\mathcal{O}_\rho \leftarrow \mathcal{O}(\mathcal{T}_\rho, \omega)\wedge last(\Gamma_{\mathcal{O}_\rho}) \neq \perp$时，$apply(\mathcal{O}_\rho)$。
-
-下面我们给出面向链上链下协同计算的通用协议的具体功能与执行逻辑。协议主要基于上述讨论的抽象智能合约与协同计算交易思想实现了理想情况下的协同计算，并被设计用于简单账本与NIZK的混合模型中。
+由用户$u$发起的涉及一次基于$p$的链下计算的分段式交互流程如下所示。两段操作从失败回退上看是独立的原子操作，这意味着尽管在某段计算中出现失败会导致该阶段执行失败，但系统会回到上一个阶段执行完成的状态，保留了协同计算过程的部分正确信息。自然地，分段式协同计算可被扩展到涉及多方链下计算的场景中，详细内容我们将在下一小节中作阐述。
 
 \begin{center}
-    面向链上链下协同计算的通用协议
+    用户$u$发起的涉及一次基于$p$的链下计算的分段式交互流程
 \end{center}
 \noindent\hrule
 \begin{description}
-    \item[初始状态] 账本状态$(\sigma, \rho) \leftarrow (\varnothing, \varnothing)$，已确认交易集合$S_\mathcal{T} \leftarrow \epsilon$，系统状态为$\mathsf{T}$
+\setlength{\itemsep}{0pt}
+\setlength{\parsep}{0pt}
+\setlength{\parskip}{0pt}
+    \item[收到来自用户$u$的交易]$\tau_\sigma$
     
-    \item[账本状态更新] 检查账本上交易，验证未确认交易的依赖与证明。
-    
-    如果满足条件，基于状态转移函数$\Gamma_{\mathcal{O}}$更新系统状态$(\sigma, \rho) \leftarrow (\sigma', \rho')$，将交易$\tau$标记为已确认交易$S_\mathcal{T} \leftarrow S_\mathcal{T}\parallel\tau$并返回必要的交易回执$y$
+    let $(\sigma, c, y) \leftarrow \Gamma_{\mathcal{O}_\sigma}(\tau_\sigma)$
 
-    对于失败的交易，系统返回拒绝信息并置为$\perp$
+    if $\sigma = \perp$, then return $y$
 
-    \item[所有交互的前置条件] 更新账本状态，对于账本上被拒绝的交易，其他依赖于该笔交易的未确认交易也应被拒绝
+    let $(q_\rho, r) \leftarrow y$
 
-    \item[收到用户$u$的提交请求$(\mathcal{T}_\sigma)$:] 两阶段执行
-    
-    \subitem [stage 1] 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\sigma$，设置上下文信息$z_\sigma \leftarrow (\sigma_o, \rho_o, D_\sigma)$；将$\mathcal{T}_\sigma$标记为未确认交易并记录在账本中
-    
-    \subitem [stage 2] 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\rho$，选取随机流$\eta$，设置上下文信息$z_\rho \leftarrow (\sigma_o, \rho_o, D_\rho, \eta)$；对于给定的链下计算节点$\mathit{p}$，构造交易$(\mathcal{T}_\rho, \omega_\rho)$，构建NIZK证明$\pi$验证$(\mathcal{T}_\rho, \omega_\rho) \in \mathcal{L}$，将$\mathcal{T}_\rho$标记为未确认交易，将$(\mathcal{T}_\rho, \pi)$记录在账本中
+    send $q_\rho$ to $p$
 
-    \item[收到用户$u$的查询请求$(\tau)$:] 如果$\tau$存在于当前的账本视图中，检索账本返回与$\tau$相关的所有输出。
+    return $r$
+    \item[链下计算节点$p$收到请求] $q_\rho(\mathcal{T}_\rho, w)$
     
-    \item[隐私泄露保证] 用户发起请求前应接受基于$\Lambda_\sigma$得到的用户隐私描述$desc_\sigma$,以确认发出的请求内容中所含数据隐私获得泄露许可；同理在构建$(\mathcal{T}_\rho, \omega_\rho)$前，隐私计算节点应接受$desc_\rho \leftarrow \Lambda_\rho$，确认NIZK证明$\pi$中泄露的数据是被同意的
+    let $(\rho, c, y) \leftarrow \Gamma_{\mathcal{O}_\rho}(q)$
+
+    if $\rho = \perp$, then return $y$
+
+    let $(\tau_\rho, r) \leftarrow y$
+    
+    $(\sigma', c', y') \leftarrow \Gamma_{\mathcal{O}_\sigma}(\tau_\rho)$
+
+    return $y'$ 
 \end{description}
 \noindent\hrule
 
-\subsection{UC框架下的协议描述}
+\subsection{复杂分段式提交}
+在上节中，我们对涉及一次链下计算的单次协同计算过程进行了分析，介绍了分段式提交在协同计算中的交互方式。但是在复杂的协同计算应用中，可能需要多方链下计算的参与，一个朴素的思路是继续采用分段的方式通过交易链的形式将它们串联起来。然而这面临了多笔交易并发的问题，对此我们考虑通过依赖性分析解决协同计算的并发问题，随后给出复杂情况下的分段式提交流程。
 
-\section{安全性分析}
-哈哈
+~\\
+\noindent\textbf{链下计算的依赖性分析}
+
+在链上链下协同计算中除了链上交易的依赖性之外，还存在链下计算的依赖性。链下的依赖不需要作单独的统计，这是因为在我们的模型中链下计算请求是被动创建的，往往与一笔链上交易绑定在一起。接下来我们对这一定论作详细解释。
+
+受限于本地状态，链下计算的依赖都基于同一链下计算节点的不同计算间。此时可以分为两种情况作讨论：
+\begin{enumerate}
+    \item 两次链下计算服务于同一次协同计算过程
+    
+    在一次协同计算间每次链下计算的调用都伴随着一次链上交易，因此两次计算一定存在必要的前后顺序并可以在合约逻辑中提前确定。此时只需要根据创建请求对应交易的依赖信息即可区分出链下计算的执行顺序。
+    \item 两次链下计算分属于不同的协同计算过程
+    
+    定理：两次链下计算的顺序可根据交易顺序间接确定
+
+    证明：设存在并发的两次协同计算${cal}_1, {cal}_2$中都对同一链下计算节点$p$的创建请求，创建请求对应的链上交易分别为$\tau_{{cal}_1}^{before}, \tau_{{cal}_2}^{before}$，完成链下计算后用于更新状态的链上交易为$\tau_{{cal}_1}^{after}, \tau_{{cal}_2}^{after}$，链下计算请求分别为$q_{{cal}_1}, q_{{cal}_2}$。我们假设创建请求对应的链上交易对应正确顺序为$\tau_{{cal}_1}^{before} \prec \tau_{{cal}_2}^{before}$。如果序列化执行两次协同计算，前序的每笔交易都应早于后续的交易执行，因此$\tau_{{cal}_1}^{before} \prec \tau_{{cal}_2}^{before} \Rightarrow {cal}_1\prec{cal}_2 \Rightarrow (\tau_{{cal}_1}^{before}, \tau_{{cal}_1}^{after})\prec (\tau_{{cal}_2}^{before},\tau_{{cal}_2}^{after}) $。此外显然，协同计算内部的自然顺序为$\tau_{{cal}_1}^{before}\prec q_{{cal}_1} \prec \tau_{{cal}_1}^{after}, \tau_{{cal}_2}^{before}\prec q_{{cal}_2} \prec \tau_{{cal}_2}^{after}$。
+    
+    根据递推得，$\tau_{{cal}_1}^{before} \prec \tau_{{cal}_1}^{after} \prec \tau_{{cal}_2}^{before} \prec \tau_{{cal}_2}^{after}$，则$q_{{cal}_1} \prec q_{{cal}_2}$，与假设中的${cal}_1\prec{cal}_2$一致。
+    
+    综上所述，创建请求对应交易$\tau^{before}$的依赖关系决定了链下计算请求间的依赖关系。
+\end{enumerate}
+
+\noindent\textbf{链上交易的依赖性分析}
+
+针对并发交易的执行，我们会发现如果不加约束极有可能导致不同的执行顺序会导致不同的执行结果。在本文中我们假设系统运行在一个封闭的仅由一些无恶意逻辑的方法构成的单一智能合约系统中，从而避免对不同合约执行间相互作用的讨论。实际上这一部分有待在后续工作中作进一步的补充。
+
+基于上述假设，下面我们主要讨论在协同计算合约中一组交易间存在的依赖关系。一种简单的做法是对于所有未经确认的交易，我们都严格按照其提交顺序作执行。当收到一笔新交易$\tau$时，我们将其附加到待确认交易集$U$末尾，即$U\parallel\tau$，而从$U$的头部开始依序执行交易。
+
+然而，实际上存在依赖的交易并不常见，往往涉及到对同一状态的修改或存在向同一链下计算节点发起请求时才可能会产生冲突。因此我们指出对于调换顺序会影响执行结果的交易之间应具有强依赖性，这些交易执行的顺序类似于计算过程中的关键路径。我们设定函数$dep$来创建交易的关键路径信息$D$。在协同计算过程中出现被拒绝的交易或请求，则其关键路径后的所有计算都不应该继续被创建或执行。
+
+对此，我们给出对于一笔交易其对应依赖性分析函数为$dep(U, \mathcal{T}, z)$，其中$U$为当前未确认交易有序集合，$\mathcal{T}$为交易对应的合约执行脚本，$z$为当前上下文。且函数需满足以下约束：
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parsep}{0pt}
+\setlength{\parskip}{0pt}
+    \item 当恶意调用$dep$时，其返回结果不受以下的任意约束，我们默认其为空集合$\epsilon$
+    \item 对于依赖性分析函数$dep$，其返回值应为按固定顺序排列的一组交易集合$X$，且$X \sqsubseteq U$
+    \item 保证对于$U$的任意乱序排列$U'$，如果$X \sqsubseteq U'$，则按$U'$执行交易与按$U$执行将得到最终一致的账本状态
+    \item 对于$U$中新增的一笔未确认交易$\tau$，对应合约脚本为$\mathcal{T}_\tau$，当满足以下条件之一时将其加入$X$：
+    \subitem $\mathcal{T}_\tau$与$\mathcal{T}$修改$z$中同一变量
+    \subitem $\mathcal{T}_\tau$与$\mathcal{T}$均包含链下计算请求$q_p$
+\end{itemize}
+
+\noindent\textbf{复杂分段式提交}
+
+

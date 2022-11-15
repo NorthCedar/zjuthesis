@@ -1,4 +1,4 @@
-\chapter{隐私保护的链上链下协同计算架构与协议优化}
+\chapter{用于协同计算的分段式提交协议}
 重点对协议的每次交互内容和完整性角度作阐述，分析每步可能出现的异常及对协议的影响。
 \section{设计动机与目标}
 介绍现有方案的详细实现细节，在通用性（privacyGuard）和隐私保护的可用性（hybrid On/Off-chain）上存在问题
@@ -13,27 +13,82 @@
 \subsection{高效性}
 交互次数的降低
 
-\section{协同计算架构}
-框架主要分为三层，在链上合约和链下计算之外引入交互验证作为缓冲层。
-
-\section{业务逻辑层}
-主要包括链上合约的执行逻辑、链上验证的调用、对链上状态的更新
-
-\section{协同计算层}
-主要包括验证密钥的保存、链上验证、链下计算任务的构建
-
-\section{链下计算层}
-主要包括对链上任务的响应与回调、链下计算、隐私数据的自动获取、计算节点的可用性保证</br>
-链下计算：为实现zk-SNARKs计算方案，需要证明模块和预处理模块</br>
-//局部架构图主要内容:
-1. 程序编译
-2. 见证计算
-3. 可信设置
-4. 证明生成
-5. 证明验证
-
-\section{链上状态变更协议架构}
+\section{协议内容与安全性分析}
 由链上构建链下计算任务，通过交易方式完整记录所有链上链下交互内容，链下计算节点的回调完成合约的后续状态变更
+
+基于前述的模型构建与分析，我们可以构造出面向链上链下协同计算的通用协议用来抽象化协同计算的整体过程。协议的核心思想为将一次完整的协同计算转化为两阶段执行：1）首先用户签署隐私泄露描述并构建一阶段交易调用智能合约方法，链上更新状态；2）在第二阶段中我们使用NIZK来证明链上合约与链下计算的交互过程，并在链上应用相关的公共状态。
+
+其中需要NIZK证明的交互过程$\mathcal{L}$可以被描述为：定义$(\mathcal{T}_\rho, \omega) \in \mathcal{L}$，给定任意状态转移函数$\Gamma$，当且仅当$\mathcal{O}_\rho \leftarrow \mathcal{O}(\mathcal{T}_\rho, \omega)\wedge last(\Gamma_{\mathcal{O}_\rho}) \neq \perp$时，$apply(\mathcal{O}_\rho)$。
+
+下面我们给出面向链上链下协同计算的通用协议的具体功能与执行逻辑。协议主要基于上述讨论的抽象智能合约与协同计算交易思想实现了理想情况下的协同计算，并被设计用于简单账本与NIZK的混合模型中。
+
+\begin{center}
+    面向链上链下协同计算的通用协议
+\end{center}
+\noindent\hrule
+\begin{description}
+    \item[初始状态] 账本状态$(\sigma, \rho) \leftarrow (\varnothing, \varnothing)$，已确认交易集合$S_\mathcal{T} \leftarrow \epsilon$，系统状态为$\mathsf{T}$
+    
+    \item[账本状态更新] 检查账本上交易，验证未确认交易的依赖与证明。
+    
+    如果满足条件，基于状态转移函数$\Gamma_{\mathcal{O}}$更新系统状态$(\sigma, \rho) \leftarrow (\sigma', \rho')$，将交易$\tau$标记为已确认交易$S_\mathcal{T} \leftarrow S_\mathcal{T}\parallel\tau$并返回必要的交易回执$y$
+
+    对于失败的交易，系统返回拒绝信息并置为$\perp$
+
+    \item[所有交互的前置条件] 更新账本状态，对于账本上被拒绝的交易，其他依赖于该笔交易的未确认交易也应被拒绝
+
+    \item[收到用户$u$的提交请求$(\mathcal{T}_\sigma)$:] 两阶段执行
+    
+    \subitem [stage 1] 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\sigma$，设置上下文信息$z_\sigma \leftarrow (\sigma_o, \rho_o, D_\sigma)$；将$\mathcal{T}_\sigma$标记为未确认交易并记录在账本中
+    
+    \subitem [stage 2] 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\rho$，选取随机流$\eta$，设置上下文信息$z_\rho \leftarrow (\sigma_o, \rho_o, D_\rho, \eta)$；对于给定的链下计算节点$\mathit{p}$，构造交易$(\mathcal{T}_\rho, \omega_\rho)$，构建NIZK证明$\pi$验证$(\mathcal{T}_\rho, \omega_\rho) \in \mathcal{L}$，将$\mathcal{T}_\rho$标记为未确认交易，将$(\mathcal{T}_\rho, \pi)$记录在账本中
+
+    \item[收到用户$u$的查询请求$(\tau)$:] 如果$\tau$存在于当前的账本视图中，检索账本返回与$\tau$相关的所有输出。
+    
+    \item[隐私泄露保证] 用户发起请求前应接受基于$\Lambda_\sigma$得到的用户隐私描述$desc_\sigma$,以确认发出的请求内容中所含数据隐私获得泄露许可；同理在构建$(\mathcal{T}_\rho, \omega_\rho)$前，隐私计算节点应接受$desc_\rho \leftarrow \Lambda_\rho$，确认NIZK证明$\pi$中泄露的数据是被同意的
+\end{description}
+\noindent\hrule
+
+\section{安全性分析}
+\subsection{基于KACHAIN的前置建模}
+简单账本模型
+
+零知识证明
+
+理想世界函数
+
+\subsection{UC框架下的安全协议描述}
+基于上述建模，我们给出链上链下协同计算协议在现实世界中的函数定义。在函数构造中我们通过转移函数$\Gamma$完成状态的转移，并用$desc$来代表协议的数据泄露，以及依赖分析函数$dep$计算交易中的依赖关系，从而在逻辑上概括分段式的协同计算过程。
+
+我们设定协议运行在NIZK与简单账本的混合模型中$(\mathcal{F}_{nizk}^\mathcal{L}, \mathcal{G}_{simple})$，其中NIZK证明的交互过程$\mathcal{L}$可以被描述为：定义$(\mathcal{T}_\rho, \omega) \in \mathcal{L}$，给定任意状态转移函数$\Gamma$，当且仅当$\mathcal{O}_\rho \leftarrow \mathcal{O}(\mathcal{T}_\rho, \omega)\wedge last(\Gamma_{\mathcal{O}_\rho}) \neq \perp$时，$apply(\mathcal{O}_\rho)$。
+
+\begin{algorithm}[H]
+    \begin{algorithmic} 
+        \STATE hellp
+        \REQUIRE $n \geq 0 \vee x \neq 0$
+        \ENSURE $y = x^n$
+        \STATE $y \Leftarrow 1$
+        \IF{$n < 0$}
+            \STATE $X \Leftarrow 1 / x$
+            \STATE $N \Leftarrow -n$
+        \ELSE
+            \STATE $X \Leftarrow x$
+            \STATE $N \Leftarrow n$
+        \ENDIF
+        \WHILE{$N \neq 0$}
+            \IF{$N$ is even}
+                \STATE $X \Leftarrow X \times X$
+                \STATE $N \Leftarrow N / 2$
+            \ELSE[$N$ is odd]
+                \STATE $y \Leftarrow y \times X$
+                \STATE $N \Leftarrow N - 1$
+            \ENDIF
+        \ENDWHILE
+    \end{algorithmic}
+    \caption{\label{alg:function}链上链下协同计算安全协议}
+\end{algorithm}
+
+\subsection{UC证明}
 
 \section{针对迭代计算的优化策略}
 在完成链上验证时附带下一次计算任务信息，减少链上链下交互次数
