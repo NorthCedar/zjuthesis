@@ -113,7 +113,7 @@
 \begin{enumerate}
     \item 由链下节点维护的账本状态$\rho$造成的冲突
     \subitem 由于链下节点账本的隔离性，能够造成冲突的交易一定由同一个链下计算节点发起。因此我们可以将问题转化为如何解决链下计算节点交易的冲突计算。
-    \subitem 对此，链下计算节点必须维护一个待确认交易集$U$，用于缓存尚未成功提交到区块链账本上的交易信息。当收到一次新的链下计算请求并成功构建一笔新交易$\tau$时，我们将其附加到待确认交易集末尾，即$U \leftarrow U\parallel\tau$。当确认该交易被成功应用到账本后则将其从$U$中删去，即$U \leftarrow U / \tau$。
+    \subitem 对此必须维护一个待确认交易集$U$，用于缓存尚未成功提交到区块链账本上的交易信息。当收到一次新的链下计算请求并成功构建一笔新交易$\tau$时，我们将其附加到待确认交易集末尾，即$U \leftarrow U\parallel\tau$。当确认该交易被成功应用到账本后则将其从$U$中删去，即$U \leftarrow U / \tau$。
     \subitem 若当前节点$p$收到新的链下计算请求，其对应的状态交互序列为$\mathcal{T}_\rho$，其对应将要创建的链下计算交易为$\tau_p$。显然我们可以直接将$U$作为$\tau_p$的依赖交易集。
     \subitem 然而实际上存在依赖的交易并不常见，只有涉及到对同一账本状态的修改才会产生冲突。因此我们指出对于调换顺序会影响执行结果的交易之间应具有强依赖性，这些交易执行的顺序类似于计算过程中的关键路径。进一步地，我们给出关键路径计算函数$D \leftarrow dep(U, \mathcal{T}_\rho)$来计算$\tau_p$实际依赖的最小交易集合，其具体逻辑如下：
     \begin{itemize}
@@ -126,12 +126,12 @@
     \end{itemize}
     \subitem 需要注意的是对于一笔提交到账本后被拒绝的交易，在将其踢出$U$之外，还应将依赖于其的交易标记为被拒绝并踢出$U$。
     \item 由链上节点维护的账本状态$\sigma$造成的冲突
-    \subitem 由于链上状态是公开可见的，因此可以直接根据交易的先后到达顺序作执行，并进行状态变更。交易间如果产生冲突，则后提交的交易一定会被拒绝，从而保证不会出现像链下状态一样的隐藏错误提交。
+    \subitem 与链下计算不同，由于链上状态是公开可见的，因此可以直接根据交易的先后到达顺序作执行，并进行状态变更。
 \end{enumerate}
 
 \paragraph{复杂分段式提交} 基于上述讨论，接下来我们针对不同方案下的多交易场景给出对应的分段式提交流程。在本文中我们假设系统运行在一个封闭的仅由一些无恶意逻辑的方法构成的单一智能合约系统中，从而避免对不同合约执行间相互作用的讨论。
 
-当并发执行交易和链下计算请求时，我们使用前述的关键路径计算函数$dep$来计算交易对应的依赖信息$D$，在链下计算交易中也将附带$D$从而保证正确执行顺序。其中$\Sigma$为当前账本已确认交易集合，$updateState$函数主要逻辑：1）根据$\Sigma$完成对$U$的更新；2）基于$\Sigma$对应的账本状态$(\sigma, \rho)$依次执行$U$中交易并返回状态转移结果。
+当并发执行交易和链下计算请求时，我们使用前述的关键路径计算函数$dep$来计算交易对应的依赖信息$D$，在链下计算交易中也将附带$D$从而保证正确执行顺序。其中$\Sigma$为当前账本已确认交易集合，$updateState$函数主要逻辑：1）根据$\Sigma$完成对$U$的初始化；2）基于$\Sigma$对应的账本状态$(\sigma, \rho)$依次执行$U$中交易并返回状态转移结果。
 
 \begin{breakablealgorithm}
     \caption{并发分段式提交流程}
@@ -152,7 +152,7 @@
         \ENDIF
         \STATE return $REJECTED$
         \item[链下计算节点$p$收到请求]:$q_p$
-        \STATE $(U, \sigma, \rho) \leftarrow updateState(U, \sigma, \rho)$
+        \STATE $(U, \sigma, \rho) \leftarrow updateState(\sigma, \rho)$
         \STATE let $(\sigma, \rho, \mathcal{T}_\sigma, \mathcal{T}_\rho, y) \leftarrow \Gamma_{\mathcal{O}_\sigma, \mathcal{O}_\rho}(q_p)$
         \IF {$\sigma = \perp \vee \rho = \perp$} 
         \STATE return $REJECTED$
@@ -165,60 +165,86 @@
     \end{algorithmic}
 \end{breakablealgorithm}
 
-\section{隐私保护协同计算协议}
-本节中我们基于前述的模型构建和分析，给出完整的隐私保护协同计算协议。协议的核心思想为将一次协同计算过程拆分为多笔交易的方式执行，两笔交易之间通过链下计算请求的方式完成传递。对于账本状态$(\sigma, \rho)$的转移基于链下计算和链上计算共同完成，而对账本状态的应用前提则是链上计算的完成和使用NIZK算法核验链下计算合法性。
-
-下面我们给出协议的文字化描述，我们定义协议的外部输入包含两类，会造成账本变化的post请求，和查询账本信息的check请求。其中post请求包含用户创建协同计算的交易$\tau_sigma$和链下计算节点回调的交易$\tau_\rho$。
+\section{隐私保护协同计算协议UC-SC}
+\subsection{理想函数}
+本节我们将描述隐私保护协同计算协议的理想函数$\mathcal{F}_{sc}$。
+\paragraph{Post} 该子函数负责处理用户$u$和链下计算节点$p$发起的请求，其中包含与理想账本函数$\mathcal{F}_{ledger}$、理想NIZK函数$\mathcal{F}_{NIZK}^\mathcal{L}$的协作。子函数具体逻辑描述如下：
 \begin{breakablealgorithm}
-    \caption{隐私保护协同计算协议}
+    \caption{$\mathcal{F}_{Post}$}
     \label{alg:ch4-4}
     \begin{algorithmic} 
-        \item[获取账本状态]: 
-        \STATE 设置账本初始状态$(\sigma, \rho) \leftarrow (\varnothing, \varnothing)$
-        检查账本上交易，验证账本交易中的依赖与证明。
-
-        \item[所有交互的前置条件]: 更新账本状态，对于账本上被拒绝的交易，其他依赖于该笔交易的未确认交易也应被拒绝
-        \item[收到$p$的请求]:$(post, \tau)$
-        \STATE 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\sigma$，设置上下文信息$z_\sigma \leftarrow (\sigma_o, \rho_o, D_\sigma)$；将$\mathcal{T}_\sigma$标记为未确认交易并记录在账本中
-        \STATE 读取账本，获取当前状态$(\sigma_o, \rho_o)$，计算交易依赖$D_\rho$，选取随机流$\eta$，设置上下文信息$z_\rho \leftarrow (\sigma_o, \rho_o, D_\rho, \eta)$；对于给定的链下计算节点$\mathit{p}$，构造交易$(\mathcal{T}_\rho, \omega_\rho)$，构建NIZK证明$\pi$验证$(\mathcal{T}_\rho, \omega_\rho) \in \mathcal{L}$，将$\mathcal{T}_\rho$标记为未确认交易，将$(\mathcal{T}_\rho, \pi)$记录在账本中
-
-        \item[收到$p$的请求]: $(check, \tau)$  
-        \STATE 如果$\tau$存在于当前的账本视图中，检索账本返回与$\tau$相关的所有输出。
+        \item[收到来自$u$的协同计算创建请求$(CREATE, w)$]:
+        \STATE 1. 取账本状态 2. 执行状态转移 3. 记录T 4. 提交账本 5. 发送q
+        \STATE 发送$(TX, \mathcal{T}_\sigma, \varnothing)$到敌手S，并收到回复$\tau_u$
+        \IF {$T(\tau_u) \neq \perp \vee \tau_u = \perp$}
+        \STATE return $\perp$
+        \ENDIF
+        \STATE let $T(\tau_u) \leftarrow (\mathcal{T}_\sigma, \varnothing, \varnothing)$
+        \STATE 发送$(submit, \tau_u)$到$\mathcal{F}_{ledger}$
+        \FOR {$q_d \in Q(CREATE)$}
+        \STATE 发送$(COMPUTE, q_d)$到链下计算节点$d$
+        \ENDFOR
+        \STATE return $\tau_u$
+        \item[收到来自$p$链下计算完成请求$(POST, (\mathcal{T}_\sigma, D, \pi))$]:
+        \STATE 1. 取账本状态 2. 执行verify 3. 提交账本 4. 发送q
+        \STATE 发送$(TX, \mathcal{T}_\sigma, D, \pi)$到敌手S，并收到回复$\tau_u$
+        \IF {$T(\tau_u) \neq \perp \vee \tau_u = \perp$}
+        \STATE return $\perp$
+        \ENDIF
+        \STATE let $\tau_p \leftarrow (\mathcal{T}_\sigma, D, \pi)$
+        \STATE 发送$(submit, \tau_p)$到$\mathcal{F}_{ledger}$
+        \FOR {$q_d \in Q(POST)$}
+        \STATE 发送$(COMPUTE)$到链下计算节点$d$
+        \ENDFOR
+        \STATE return $\tau_p$
+        \item[收到来自$u$的协同计算查询请求$(QUERY, \tau_u)$]:
+        \STATE 1. 取账本状态 2. 执行verify 3. 更新sigma
+        \IF {$T(\tau_u) \neq (u, \cdot, \cdot, \cdot, \cdot)$}
+        \STATE return $\perp$
+        \ENDIF
+        \STATE let $\Sigma_u \leftarrow updateState(u)$
+        \IF {$\tau_u \notin \Sigma_u$}
+        \STATE return NOTFOUND
+        \ENDIF
+        \STATE let $\tau_f \leftarrow getLast(\Sigma_u, \tau_u)$
+        
     \end{algorithmic}
 \end{breakablealgorithm}
 
-\section{安全性分析}
-\subsection{理想函数}
+\paragraph{Compute} 该子函数主要负责处理链下计算节点收到的请求，同样包含与理想账本函数$\mathcal{F}_{ledger}$、理想NIZK函数$\mathcal{F}_{NIZK}^\mathcal{L}$的协作。子函数具体逻辑描述如下：
 
-\subsection{协同计算协议的UC描述}
-基于上述建模，我们给出链上链下协同计算协议在现实世界中的函数定义。在函数构造中我们通过转移函数$\Gamma$完成状态的转移，并用$desc$来代表协议的数据泄露，以及依赖分析函数$dep$计算交易中的依赖关系，从而在逻辑上概括分段式的协同计算过程。
+\subsection{协议实现}
+本节中我们基于前述的模型构建和分析，给出完整的隐私保护协同计算协议。协议的核心思想为将一次协同计算过程拆分为多笔交易的方式执行，两笔交易之间通过链下计算请求的方式完成传递。对于账本状态$(\sigma, \rho)$的转移基于链下计算和链上计算共同完成，而账本的执行则是基于状态转移结果和使用NIZK算法核验链下计算合法性。
 
-我们设定协议运行在NIZK与简单账本的混合模型中$(\mathcal{F}_{nizk}^\mathcal{L}, \mathcal{G}_{simple})$，其中NIZK证明的交互过程$\mathcal{L}$可以被描述为：定义$(\mathcal{T}_\rho, \omega) \in \mathcal{L}$，给定任意状态转移函数$\Gamma$，当且仅当$\mathcal{O}_\rho \leftarrow \mathcal{O}(\mathcal{T}_\rho, \omega)\wedge last(\Gamma_{\mathcal{O}_\rho}) \neq \perp$时，$apply(\mathcal{O}_\rho)$。
-
-\begin{algorithm}[H]
+下面我们给出协议的文字化描述，我们定义协议的外部输入包含两类，请求创建协同计算的用户请求$CREATE$，和链下计算请求$COMPUTE$。而对应的分布式账本中包含两类交易：用户创建协同计算的交易$\tau_u$和链下计算节点回调的交易$\tau_p$。对于参与方$p$在协同计算中担任两种角色，即协同计算发起者$u$，或链下计算节点。当其作为链下计算节点收到链下计算请求时将构建对应的链下计算完成请求作为返回。
+\begin{breakablealgorithm}
+    \caption{隐私保护协同计算组合协议}
+    \label{alg:ch4-10}
     \begin{algorithmic} 
-        \STATE hellp
-        \REQUIRE $n \geq 0 \vee x \neq 0$
-        \ENSURE $y = x^n$
-        \STATE $y \Leftarrow 1$
-        \IF{$n < 0$}
-            \STATE $X \Leftarrow 1 / x$
-            \STATE $N \Leftarrow -n$
-        \ELSE
-            \STATE $X \Leftarrow x$
-            \STATE $N \Leftarrow n$
-        \ENDIF
-        \WHILE{$N \neq 0$}
-            \IF{$N$ is even}
-                \STATE $X \Leftarrow X \times X$
-                \STATE $N \Leftarrow N / 2$
-            \ELSE[$N$ is odd]
-                \STATE $y \Leftarrow y \times X$
-                \STATE $N \Leftarrow N - 1$
-            \ENDIF
-        \ENDWHILE
-    \end{algorithmic}
-    \caption{\label{alg:function}链上链下协同计算安全协议}
-\end{algorithm}
+        \item [\textbf{链上协议$\mathcal{P}_{Post}$}] 
+        \item[收到来自$u$的协同计算创建请求$(CREATE)$]:
+        \STATE 构建协同计算创建交易$\tau_u$，发送交易到分布式账本。
+        \STATE 如果交易中存在链下计算请求，将发送请求$(COMPUTE)$到指定节点$p$。
+        \item[收到来自$p$链下计算完成请求$(POST, (\mathcal{T}_\sigma, D, \pi))$]:
+        \STATE 构建链下计算交易$\tau_p$，发送交易到分布式账本。 
+        \STATE 如果交易中存在链下计算请求，将发送请求$(COMPUTE)$到指定节点$p$。
+        \item[收到来自$u$的协同计算查询请求$(QUERY, \tau_u)$]:
+        \STATE 验证账本中与$\tau_u$相关的交易的证明和依赖，并返回计算结果。
 
-\subsection{UC证明}
+        \noindent\hrulefill
+        \item [\textbf{链下协议$\mathcal{P}_{Compute}$}] 
+        \item[获取账本状态]: 
+        \STATE 设置账本初始状态$(\sigma, \rho) \leftarrow (\varnothing, \varnothing)$
+        \STATE 检查账本上交易: 对于链下计算交易则验证账本交易中的依赖与证明，验证失败标记为被拒绝的交易。执行交易完成状态转移。状态不为$\perp$，标记为已确认交易并更新账本状态，否则标记为被拒绝的交易。
+        \STATE 若其在待确认交易集合中则将其移出。
+        \item[处理请求的前置条件]: 
+        \STATE 重新获取账本状态，对于账本上被拒绝的交易，其他依赖于该笔交易的未确认交易也应被拒绝，并从待确认交易中移除。
+        \item[收到来自$c$的链下计算请求$(COMPUTE)$]:
+        \STATE 基于当前账本状态$(\sigma, \rho)$，执行待确认交易集合所有交易得到新的账本状态$(\sigma', \rho')$。
+        \STATE 基于该状态执行$(COMPUTE)$请求的链下计算，得到对应的预期账本状态$(\sigma'', \rho'')$。计算对应的交易依赖$D$。
+        \STATE 基于交易依赖和链下计算过程生成NIZK证明$\pi \leftarrow ((\mathcal{T}_\sigma, D), \mathcal{T}_\rho) \in \mathcal{L}$。
+        \STATE 发送链下计算完成请求$(POST,(\mathcal{T}_\sigma, D, \pi))$到$c$，将返回结果$\tau_p$记录到待确认交易集合中。
+    \end{algorithmic}
+\end{breakablealgorithm}
+
+\section{隐私保护协同计算协议的安全证明}
