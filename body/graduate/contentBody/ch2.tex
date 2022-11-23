@@ -41,7 +41,7 @@
 
     而安全假设方面，zk-SNARKs需要基于一次性的信任设置来生成用于计算的公共字符串，根据具体实现方案可以将其分为针对每个计算的CRS与全局化的SRS。为减少信任假设，一些工作\cite{cryptoeprint:2017/1050, 7163032}将多方安全计算协议（MPC）应用于信任设置，从而保证当至少一个参与方诚实时该信任设置即为可信的。
     \item Bulletproofs：与zk-SNARKs不同，Bulletproofs\cite{8418611}无需可信设置。从证明大小上看其与计算程序的复杂度成对数相关，一般的小型程序对应证明大小在几KB范围内。证明的生成复杂度也是线性相关于计算复杂度。然而与zk-SNARKs不同的是其链上验证的复杂度也是线性的。这意味着一旦链下计算复杂度过大，链上验证将会变得极为昂贵。
-    \item zk-STARKs：同样是无需信任设置的zk-STARKs\cite{cryptoeprint:2018/046}使用了AIR(algebraic intermediate representation)作为其核心思路。其将计算语句转换为高次多项式，但实际上AIR程序同样也能被扩展为算数电路的形式。但是这类方案的证明和验证复杂度都较高，分别为拟线性和多项式对数级别相关于计算复杂度。同时其证明大小也比另两类大得多，对于同样的小型程序其大小在数百KB左右。
+    \item zk-STARKs：同样是无需信任设置的zk-STARKs\cite{cryptoeprint:2018/046}使用了AIR(algebraic intermediate representation)作为其核心思路。其将计算语句转换为高次多项式，但实际上AIR程序同样也能被扩展为算术电路的形式。但是这类方案的证明和验证复杂度都较高，分别为拟线性和多项式对数级别相关于计算复杂度。同时其证明大小也比另两类大得多，对于同样的小型程序其大小在数百KB左右。
 \end{itemize}
 
 \subsection{基于激励机制的链下计算方案}
@@ -87,17 +87,34 @@ TEEs作为一种执行环境从硬件层面来保证数据和代码的可信性�
 \paragraph{相关工作} 
 Enigma\cite{enigma2019}设计了使用Intel SGX作为TEEs方案的链下计算方案。该方案是对文献\cite{2015arXiv150603471Z}中使用多方安全计算协议进行链下计算的工程实现。Enigma支持将合约中的部分内容标记为隐私内容从而强制其在链下计算中进行并给出了较优的实现性能。然而该工作存在不能较好抵御针对TEEs的侧信道攻击问题\cite{217543}。而另一个使用TEEs技术的工作是Ekiden\cite{2018arXiv180405141C}。与Enigma支持链上计算不同，Ekiden将区块链作为一个单纯的状态持久化模块。一旦链下计算完成，TEEs会将计算结果直接返回给用户并更新链上状态。这也导致这一框架存在不支持链上计算的缺点。
 
+\newpage
 \subsection{技术对比与评估}
 \begin{table}[htbp]
-    \caption{\label{tab:ch2-1}自动调节列宽的表格}
-    \begin{tabularx}{\linewidth}{c|c|X<{\centering}}
-        \hline
-        \multicolumn{2}{c|}{学生信息} & hh \\ \hline
-        xxx & xxxhhhhhhh & hh \\ \hline
-        xxx & xxx & hhEkiden将区块链作为一个单纯的状态持久化模块。一旦链下计算完成，TEEs会将计算结果直接返回给用户并更新链上状态。这也导致这一框架存在不支持链上计算的缺点。 \\ \hline
-        xxx & xxx & hh \\ \hline
+    \caption{\label{tab:ch2-1}链下计算方案对比}
+    \begin{tabularx}{\linewidth}{c|c|c|X<{\centering}}
+        \toprule [1pt]
+        \multirow{2}*{} & \multicolumn{3}{c}{\textbf{可验证计算}} \\ \cline{2-4}
+         & \textbf{zk-SNARKs} & \textbf{Bulletproofs} & \textbf{zk-STARKs} \\ \hline
+        隐私输入 & 是 & 是 & 是 \\ \hline
+        链上验证 & \makecell[c]{可信设置复杂度：$O(n)$ \\ 验证复杂度：$O(1)$ \\ 证明大小：$O(1)$ \\ $n$为计算电路乘法\\门数量} & \makecell[c]{验证复杂度：$O(n)$ \\ 证明大小：$O(\log n)$ \\ $n$为计算电路乘法\\门数量} & \makecell[c]{验证复杂度：$O(\log^2n)$ \\ 证明大小：$O(\log^2n)$ \\ $n$为计算电路(AIR转换后)\\乘法门数量} \\ \hline
+        链下计算 & $O(n\log n)$ & $O(n)$ & $O(n\log^2n)$ \\ \hline
+        安全假设 & \makecell[c]{指数知识假设KEA\\与可信设置} & 离散对数问题 & 抗碰撞哈希函数CRHF \\ \hline
+        计算程序 & 算术电路 & 算术电路 & AIR(可转换为电路) \\ 
+        \midrule [1pt]
+        & \textbf{激励机制} & \textbf{MPC} & \textbf{TEEs} \\ \hline
+        隐私输入 & 否 & 是 & 是 \\ \hline
+        %链上验证 & 二分查找复杂度\cite{2019arXiv190804756T}：$O(\log n)$ & \makecell[c]{链上审计复杂度：$O(n)$ \\ 审计内容大小：$O(n)$ \\ $n$为计算电路中门的数量\cite{cryptoeprint:2014/075}} & TEEs验签\cite{217543}：$O(1)$ \\ \hline
+        链下计算 & VM生成执行历史 & $O(n)$ & TEEs证明生成 \\ \hline
+        安全假设 & \makecell[c]{以最大化经济收益\\为目标的理性参与者} & \makecell[c]{诚实参与者数量\\达到协议阈值} & 信任TEEs证书 \\ \hline
+        计算程序 & 编译后的VM指令集 & 布尔/算术电路 & 由TEEs编译后的机器码 \\ 
+        \bottomrule [1pt]
     \end{tabularx}
 \end{table}
+在2.1中我们主要讨论和比较了链下计算方案，在阐明其核心思路后对相关工作进行了介绍。对此我们发现基于激励机制的链下计算方案虽然有助于区块链的扩展但不提供完全的隐私保护，一些协议\cite{217511, 8750913}采用将数据在选定范围内传播的方式降低隐私泄露风险。而针对TEEs方案，可以看到基于可信硬件制造商的额外信任极大损害了区块链的原生弱信任特性。而基于MPC协议的方案需要同时保证通信的不可阻断和可公开审计，目前满足该条件的工作还有待进一步实现。
+
+因此通过分析，我们认为基于可验证计算的链下计算方案成为一个较为理想的解决思路。尤其对于使用zk-SNARKs的技术方案，其在提供较强计算隐私保护的同时，可以通过非交互式的形式在链上快速验证计算的正确性且无需过多的链上存储空间。在安全假设上可将必须的可信设置优化为一个全局性的过程，并使用MPC协议来进一步降低其信任依赖。
+
+然而这些链下计算方案都将重心放在了链下计算在链上验证的框架描述上，对于如何在隐私保护的前提下使用链下计算在链上进行协同计算并没有过多的介绍，这也促使我们尝试通过本文工作解决一问题。
 
 \section{链上链下协同计算}
 区块链的链上计算
