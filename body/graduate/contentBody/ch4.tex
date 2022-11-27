@@ -1,5 +1,5 @@
 \chapter{基于分段式提交的隐私保护协同计算协议}
-协同计算状态更新协议规范了链上链下协同计算间的交互内容，基于上一章所述的通用模型安全实现了基于链下隐私计算的账本状态更新。本章我们主要围绕协议的设计进行叙述。首先，我们将阐明协议设计的动机与目标；其次，我们将逐一对协议的每个模块与流程作介绍；最后我们将基于UC安全框架论证协议的安全性，并指出针对协议的性能优化策略。
+协同计算状态更新协议规范了链上链下协同计算间的交互内容，基于上一章所述的通用模型安全实现了基于链下隐私计算的账本状态更新。本章我们主要围绕协议的设计进行叙述。首先，我们将阐明协议设计的动机与目标；其次，我们将对协议的每个模块与流程作介绍；最后我们将基于UC安全框架论证协议的安全性。
 \section{设计动机与目标}
 介绍现有方案的详细实现细节，在通用性（privacyGuard）和隐私保护的可用性（hybrid On/Off-chain）上存在问题
 1. 链下计算请求未上链，无法留证，导致数据所有方无法信任请求方
@@ -167,46 +167,105 @@
 
 \section{隐私保护协同计算协议UC-SC}
 \subsection{理想函数}
-本节我们将描述隐私保护协同计算协议的理想函数$\mathcal{F}_{sc}$。
-\paragraph{Post} 该子函数负责处理用户$u$和链下计算节点$p$发起的请求，其中包含与理想账本函数$\mathcal{F}_{ledger}$、理想NIZK函数$\mathcal{F}_{NIZK}^\mathcal{L}$的协作。子函数具体逻辑描述如下：
+本节我们将描述隐私保护协同计算协议的理想函数$\mathcal{F_{ideal}}$。
 \begin{breakablealgorithm}
     \caption{$\mathcal{F}_{Post}$}
     \label{alg:ch4-4}
     \begin{algorithmic} 
-        \item[收到来自$u$的协同计算创建请求$(CREATE, w)$]:
-        \STATE 1. 取账本状态 2. 执行状态转移 3. 记录T 4. 提交账本 5. 发送q
-        \STATE 发送$(TX, \mathcal{T}_\sigma, \varnothing)$到敌手S，并收到回复$\tau_u$
-        \IF {$T(\tau_u) \neq \perp \vee \tau_u = \perp$}
-        \STATE return $\perp$
+        \item[初始状态]: 
+        \STATE $T \leftarrow \varnothing$，存放交易对应的状态交互序列
+        \STATE $U_p \leftarrow \varnothing$，存放$p$的未确认交易集合
+        \item[收到来自$p$的协同计算创建请求$(CREATE, w)$]:
+        \STATE 代表$p$发送 $(READ)$ 给 $G_l$, 收到 $\Sigma_p$
+        \STATE let $(\phi, \cdot, \cdot) \leftarrow execState(\Sigma_p)$
+        \STATE let $(lkg, D, z) \leftarrow execQuery(p, w, \phi, \varnothing, \varnothing)$
+        \STATE 发送$(TX, lkg, D, \cdot)$到敌手S，并收到回复$(\tau, a)$
+        \IF {$T(\tau) \neq \perp \vee \tau = \perp$}
+        \STATE let $\tau = \{0, 1\}^k$
         \ENDIF
-        \STATE let $T(\tau_u) \leftarrow (\mathcal{T}_\sigma, \varnothing, \varnothing)$
-        \STATE 发送$(submit, \tau_u)$到$\mathcal{F}_{ledger}$
-        \FOR {$q_d \in Q(CREATE)$}
-        \STATE 发送$(COMPUTE, q_d)$到链下计算节点$d$
+        \STATE let $T(\tau) \leftarrow (u, w, z, a, D, \tau)$
+        \FOR {$(n, q) \in Q(w)$}
+        \STATE 发送$(CALL, n, (q, \tau))$给敌手S，并收到回复$b$
         \ENDFOR
-        \STATE return $\tau_u$
-        \item[收到来自$p$链下计算完成请求$(POST, (\mathcal{T}_\sigma, D, \pi))$]:
-        \STATE 1. 取账本状态 2. 执行verify 3. 提交账本 4. 发送q
-        \STATE 发送$(TX, \mathcal{T}_\sigma, D, \pi)$到敌手S，并收到回复$\tau_u$
-        \IF {$T(\tau_u) \neq \perp \vee \tau_u = \perp$}
-        \STATE return $\perp$
+        \STATE 代表$p$发送 $(SUBMIT, \tau)$ 给 $G_l$
+        \STATE return $(POSTED, \tau)$
+
+        \item[收到来自$p$的链下计算请求$(COMPUTE, (w, \tau_q))$]:
+        \STATE 代表$p$发送 $(READ)$ 给 $G_l$, 收到 $\Sigma_p$
+        \STATE let $(\phi, \cdot, \cdot) \leftarrow execState(\Sigma_p)$
+        \STATE $U_p \leftarrow updateState(\sigma_p, U_p)$
+        \STATE let $(lkg, D, z) \leftarrow execQuery(p, w, \phi, U_p, filter(T, \tau \in U_p))$
+        \STATE 发送$(TX, lkg, D, \tau_q)$到敌手S，并收到回复$(\tau, a)$
+        \IF {$T(\tau_p) \neq \perp \vee \tau_p = \perp$}
+        \STATE let $\tau = \{0, 1\}^k$
         \ENDIF
-        \STATE let $\tau_p \leftarrow (\mathcal{T}_\sigma, D, \pi)$
-        \STATE 发送$(submit, \tau_p)$到$\mathcal{F}_{ledger}$
-        \FOR {$q_d \in Q(POST)$}
-        \STATE 发送$(COMPUTE)$到链下计算节点$d$
+        \STATE let $T(\tau) \leftarrow (u, w, z, a, D, \tau_q), U_p \leftarrow U_p \parallel \{\tau\}$
+        \FOR {$(n, q) \in Q(w)$}
+        \STATE 发送$(CALL, n, (q, \tau))$给敌手S
         \ENDFOR
-        \STATE return $\tau_p$
-        \item[收到来自$u$的协同计算查询请求$(QUERY, \tau_u)$]:
-        \STATE 1. 取账本状态 2. 执行verify 3. 更新sigma
-        \IF {$T(\tau_u) \neq (u, \cdot, \cdot, \cdot, \cdot)$}
-        \STATE return $\perp$
+        \STATE 代表$u$发送 $(SUBMIT, \tau)$ 给 $G_l$
+        \STATE return $(POSTED, \tau)$
+
+        \item[收到来自$p$的查询请求$(QUERY, \tau)$]:
+        \STATE 代表$p$发送 $(READ)$ 给 $G_l$, 收到 $\Sigma_p$
+        \IF {$\tau \notin \Sigma_p$}
+        \STATE return $(NOT FOUND)$
         \ENDIF
-        \STATE let $\Sigma_u \leftarrow updateState(u)$
-        \IF {$\tau_u \notin \Sigma_u$}
-        \STATE return NOTFOUND
+        \STATE let $R \leftarrow execResult(\Sigma_p, \tau)$
+        \STATE return $(SUCCESS, R)$
+
+        \noindent\hrulefill
+        \item[$execState(\Sigma)$]:
+        \STATE let $\phi \leftarrow \varnothing, C \leftarrow \varnothing, y \leftarrow \perp$
+        \FOR {$\tau \in \Sigma$}
+        \IF {$\tau \in C$}
+        \STATE continue
         \ENDIF
-        \STATE let $\tau_f \leftarrow getLast(\Sigma_u, \tau_u)$
+        \IF {$T(\tau) = \perp$}
+        \STATE 发送$(INPUT, \tau)$到敌手S，并收到回复$x = (p, w, z, a, D, \tau_q)$
+        \STATE let $T(\tau) \leftarrow x$
+        \ENDIF
+        \STATE let $(p, w, z, a, D, \tau_q) \leftarrow T(\tau)$
+        \IF {$p \notin H$}
+        \STATE $y \leftarrow \perp$
+        \STATE continue
+        \ENDIF
+        \IF {$D/C \neq \varnothing \vee !(D \sqsubseteq \Sigma) $}
+        \STATE continue
+        \ENDIF
+        \STATE let $(\phi', y) \leftarrow \Delta(p, w, z, a)$
+        \IF {$\phi' \neq \perp$}
+        \STATE $\phi \leftarrow \phi', C \leftarrow C \parallel \tau$
+        \ENDIF
+        \ENDFOR
+        \STATE return $(\phi, y, C)$
+
+        \item[$execQuery(p, w, \phi, U, T)$]:
+        \STATE 
+
+        \item[$updateState(\Sigma, U)$]:
+        \STATE let $(\cdot, \cdot, C) \leftarrow execState(\Sigma)$
+        \REPEAT
+        \STATE let $U' \leftarrow U$
+        \FOR {$\tau \in U$}
+        \STATE $(\cdot, \cdot, \cdot, \cdot, D, \cdot) \leftarrow T(\tau)$
+        \IF {$D \nsubseteq U \cup C \vee !(D \cap C \sqsubseteq \Sigma)$}
+        \STATE let $U \leftarrow U / \{\tau\}$
+        \ENDIF
+        \ENDFOR
+        \UNTIL {$U' = U$}
+        \STATE return $U$
+
+        \item[$execResult(\Sigma, \tau)$]: 
+        \STATE let $R \leftarrow \varnothing$
+        \STATE let $(\cdot, \cdot, C) \leftarrow execState(\Sigma)$
+        \FOR {$\tau' \in C$}
+        \STATE $(\cdot, \cdot, \cdot, \cdot, \cdot, \tau_q) \leftarrow T(\tau')$
+        \IF {$\tau_q = \tau$}
+        \STATE let $R \leftarrow R \parallel \{\tau'\}$
+        \ENDIF
+        \ENDFOR
+        \STATE return $R$
         
     \end{algorithmic}
 \end{breakablealgorithm}
